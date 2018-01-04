@@ -22,6 +22,55 @@ char *picture_buff;
 int picture_Index;
 
 
+int RealDataCallBack(long lRealHandle, SDK_H264_FRAME_INFO *pFrameInfo, unsigned long dwUser)
+{
+
+	if(pFrameInfo->nSubType == I_FRAME)
+	{
+
+		printf("00000nWidth: %d, nHeight: %d, nSubType: %d=time:%d:%d:%d=nTimeStamp:%d=\n",
+			(unsigned long)pFrameInfo->nWidth, pFrameInfo->nHeight, pFrameInfo->nSubType,pFrameInfo->nHour,pFrameInfo->nMinute,pFrameInfo->nSecond,pFrameInfo->nTimeStamp);
+	}
+	
+	if (g_pFile[dwUser] == NULL)
+	{
+		char szFile[64];
+		snprintf(szFile, sizeof(szFile), "/home/Real_0814_%02x.h264", dwUser);
+		g_pFile[dwUser] = fopen(szFile, "w+");
+		if (g_pFile[dwUser] == NULL)
+		{
+			printf("file open fail\n");
+			return -1;
+		}
+	}
+
+	if(pFrameInfo->nLength != fwrite(pFrameInfo->pHeader, 1, pFrameInfo->nLength, g_pFile[dwUser]))
+	{
+		printf("chn: %d write fail\n", dwUser);
+	}
+
+	return 0;
+}
+
+
+
+
+void RealPlay()
+{
+
+	int nRet = 0;
+	nRet = LOCALSDK_RealPlayStart(0, SDK_CAPTURE_CHN_MAIN, RealDataCallBack, 1, &g_Handle[0]);
+
+	if (LOCALSDK_SUCCESS != nRet)
+	{
+		printf("LOCALSDK_RealPlayStart fail: error: %d\n", nRet);
+	}
+
+
+}
+
+
+
 
 void CatchJPGPic(int)
 {
@@ -130,11 +179,13 @@ int main()
 
     
     Talk();
+	RealPlay();
 
 
     while(1);
 
 	LOCALSDK_VoiceCommStop(0);
+	LOCALSDK_RealPlayStop(g_Handle[0], RealDataCallBack, 1);
 
 
 	for (int i = 0; i < 32; i++)
