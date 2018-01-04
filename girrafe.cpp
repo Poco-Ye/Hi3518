@@ -8,9 +8,45 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+
+
+
 static long g_Handle[32];
 static FILE *g_pFile[32];
 LOCALSDK_DEVICE_INFO_V2 g_DevInfo;
+
+char *picture_buff;
+int picture_Index;
+
+
+
+void CatchJPGPic(int)
+{
+
+		memset(picture_buff, 0, 2000000);
+		int length = 0;
+		LOCALSDK_TrigerSnap(0,1);
+		LOCALSDK_CatchJPGPic(0, picture_buff, 2000000, &length);
+		if (length > 0)
+		{
+			char szFileName[32];
+			snprintf(szFileName, sizeof(szFileName), "/home/sdk_%dr.jpg", picture_Index);
+			FILE *pFile = fopen(szFileName, "w+");
+			fwrite(picture_buff, 1, length, pFile);
+			fclose(pFile);
+			picture_Index++;
+			printf("get pic %s\n",szFileName);
+		}
+		printf("===> cat  nret (%d)   \n", length);
+		signal(SIGALRM, CatchJPGPic);
+
+}
+
+
+
 
 
 int TalkCallBack(long lRealHandle, unsigned char *pBuffer, int nLen, unsigned long dwUser)
@@ -56,9 +92,22 @@ int Talk()
 
 int main()
 {
+
+	struct itimerval value,ovalue;
 	memset(g_Handle, 0, sizeof(g_Handle));
 	memset(g_pFile, 0, sizeof(g_pFile));
+    picture_buff =(char*)malloc(2000000*sizeof(char));	
 	LOCALSDK_StartUp();
+
+	signal(SIGALRM, CatchJPGPic);
+	value.it_value.tv_sec = 3;
+	value.it_value.tv_usec = 0;
+	value.it_interval.tv_sec = 3;
+	value.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &value, &ovalue);
+
+
+	
 
     int nRet = LOCALSDK_SUCCESS;
 	printf("start Get DevInfo   \n");
@@ -79,12 +128,12 @@ int main()
 		return -1;
 	}
 
-
+    
     Talk();
 
 
+    while(1);
 
-	sleep(5);
 	LOCALSDK_VoiceCommStop(0);
 
 
@@ -96,6 +145,8 @@ int main()
 			g_pFile[i] = NULL;
 		}
 	}
+	free(picture_buff);
+	picture_buff =NULL;
 	LOCALSDK_CleanUp();
 	return 0;
 }
